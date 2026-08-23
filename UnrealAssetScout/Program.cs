@@ -6,7 +6,6 @@ using System.Text;
 using CUE4Parse_Conversion.Textures.BC;
 using CUE4Parse.Compression;
 using CUE4Parse.Encryption.Aes;
-using CUE4Parse.FileProvider;
 using CUE4Parse.MappingsProvider.Usmap;
 using CUE4Parse.UE4.Objects.Core.Misc;
 using CUE4Parse.UE4.Versions;
@@ -15,6 +14,7 @@ using UnrealAssetScout.Export;
 using UnrealAssetScout.Incremental;
 using UnrealAssetScout.List;
 using UnrealAssetScout.Logging;
+using UnrealAssetScout.References;
 using UnrealAssetScout.Statistics;
 using UnrealAssetScout.TypeFiltering;
 using UnrealAssetScout.Update;
@@ -78,22 +78,30 @@ public static class Program
             RunStats? runStats = null;
             var exeDir = AppContext.BaseDirectory;
 
-            // CUE4Parse requires this to download zlib and oodle binaries, otherwise some extractions fail because they are absent
+            // Match upstream UnrealAssetScout: CUE4Parse resolves/downloads its compression
+            // libraries when absent, while Detex is released from the embedded resource.
             ZlibHelper.Initialize(Path.Combine(exeDir, ZlibHelper.DLL_NAME));
-            OodleHelper.Initialize(Path.Combine(exeDir, OodleHelper.OODLE_NAME_CURRENT));
+            var currentOodlePath = Path.Combine(exeDir, OodleHelper.OODLE_NAME_CURRENT);
+            var legacyOodlePath = Path.Combine(exeDir, OodleHelper.OODLE_NAME_OLD);
+            OodleHelper.Initialize(File.Exists(currentOodlePath)
+                ? currentOodlePath
+                : File.Exists(legacyOodlePath)
+                    ? legacyOodlePath
+                    : currentOodlePath);
             var detexPath = Path.Combine(exeDir, DetexHelper.DLL_NAME);
             if (!File.Exists(detexPath))
                 DetexHelper.LoadDllAsync(detexPath).GetAwaiter().GetResult();
 
             DetexHelper.Initialize(detexPath);
 
-            var provider = new DefaultFileProvider(
+            var provider = ProviderFactory.Create(
                 options.PaksDirectory!,
-                SearchOption.TopDirectoryOnly,
-                new VersionContainer(options.Game!.Value),
-                StringComparer.OrdinalIgnoreCase);
+                options.Game!.Value);
 
-            provider.ReadScriptData = options is { Mode: ExportMode.Json, ScriptBytecode: true };
+            AppLog.Information("Provider: {Provider}; game: {Game}", provider.GetType().Name, options.Game.Value);
+
+            provider.ReadScriptData = options is { Mode: ExportMode.Json, ScriptBytecode: true } ||
+                                      options.ReferenceKindScope is ReferenceKindScope.Bytecode or ReferenceKindScope.All;
 
             if (options.UsmapPath is not null)
                 provider.MappingsContainer = new FileUsmapTypeMappingsProvider(options.UsmapPath);
@@ -102,11 +110,18 @@ public static class Program
 
             // Always submit a key for the zero GUID - this is what triggers mounting.
             // For unencrypted containers any key works; for encrypted ones the real key is required.
+            var aesKeyValue = options.AesKey;
+            if (options.AesFromStandardInput &&
+                !AesKeyConfigSupport.TryReadKeyFromStandardInput(Console.In, out aesKeyValue))
+            {
+                return 1;
+            }
+
             FAesKey aesKey;
             try
             {
-                aesKey = options.AesKey is not null
-                    ? new FAesKey(options.AesKey)
+                aesKey = aesKeyValue is not null
+                    ? new FAesKey(aesKeyValue)
                     : new FAesKey(new byte[32]);
             }
             catch (ArgumentException e)
@@ -120,14 +135,14 @@ public static class Program
             if (provider.RequiredKeys.Count > 0)
             {
                 AppLog.Error(
-                    "{Count} container(s) are encrypted and could not be mounted - provide the correct AES key via --aes or --aes-file",
+                    "{Count} container(s) are encrypted and could not be mounted - provide the correct AES key via --aes-stdin, --aes, or --aes-file",
                     provider.RequiredKeys.Count);
                 return 1;
             }
 
             provider.PostMount();
             provider.LoadVirtualPaths();
-            RuntimeReporting.WarnIfAesCouldRevealMore(provider, options.AesKey is not null);
+            RuntimeReporting.WarnIfAesCouldRevealMore(provider, aesKeyValue is not null);
 
             HashSet<string>? typeFilteredPaths = null;
             if (options.TypeFilterPredicate is not null)
@@ -144,18 +159,27 @@ public static class Program
             if (options.MarkUsmap)
                 AppLog.Information("Usmap marker enabled: files that require usmap are prefixed with [*].");
 
-            StreamWriter? listOutputWriter = null;
+            StreamWriter? auxiliaryOutputWriter = null;
+            var auxiliaryOutputPath = options.ReferenceTarget is not null
+                ? options.ReferenceOutputFilePath
+                : options.ListOutputFilePath;
             if (options.Mode is null &&
-                !TryCreateListOutputWriter(options.ListOutputFilePath, out listOutputWriter))
+                !TryCreateOutputWriter(auxiliaryOutputPath, out auxiliaryOutputWriter))
             {
                 return 1;
             }
 
-            using (listOutputWriter)
+            using (auxiliaryOutputWriter)
             {
-                if (options.Mode is null)
+                if (options.ReferenceTarget is not null)
                 {
-                    ListProcessor.ListFiles(provider, options, listOutputWriter, typeFilteredPaths);
+                    var exitCode = ReferenceProcessor.Run(provider, options, auxiliaryOutputWriter);
+                    if (exitCode != 0)
+                        return exitCode;
+                }
+                else if (options.Mode is null)
+                {
+                    ListProcessor.ListFiles(provider, options, auxiliaryOutputWriter, typeFilteredPaths);
                 }
                 else
                 {
@@ -183,7 +207,7 @@ public static class Program
         }
     }
 
-    private static bool TryCreateListOutputWriter(string? outputFilePath, out StreamWriter? writer)
+    private static bool TryCreateOutputWriter(string? outputFilePath, out StreamWriter? writer)
     {
         writer = null;
         if (string.IsNullOrWhiteSpace(outputFilePath))

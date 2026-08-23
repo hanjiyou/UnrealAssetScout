@@ -1,5 +1,6 @@
 ﻿using UnrealAssetScout.Export;
 using UnrealAssetScout.Export.Exporters;
+using UnrealAssetScout.References;
 
 namespace UnrealAssetScout.Tests;
 
@@ -221,6 +222,153 @@ public class ConfigOptionsTests
 
             Assert.NotNull(options);
             Assert.Equal("0xDEADBEEF1234", options.AesKey);
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir))
+                Directory.Delete(tempDir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ParseArgs_AesStdin_SelectsStandardInputWithoutReadingIt()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), "UnrealAssetScout.Tests", Guid.NewGuid().ToString("N"));
+        var paksDir = Path.Combine(tempDir, "paks");
+
+        Directory.CreateDirectory(paksDir);
+
+        try
+        {
+            var options = ConfigOptionsSupport.ParseArgs(
+            [
+                "list",
+                "--paks", paksDir,
+                "--game", "GAME_ArcRaiders",
+                "--aes-stdin"
+            ]);
+
+            Assert.NotNull(options);
+            Assert.True(options.AesFromStandardInput);
+            Assert.Null(options.AesKey);
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir))
+                Directory.Delete(tempDir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ParseArgs_MultipleAesSources_ReturnsNull()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), "UnrealAssetScout.Tests", Guid.NewGuid().ToString("N"));
+        var paksDir = Path.Combine(tempDir, "paks");
+
+        Directory.CreateDirectory(paksDir);
+
+        try
+        {
+            var options = ConfigOptionsSupport.ParseArgs(
+            [
+                "list",
+                "--paks", paksDir,
+                "--game", "GAME_ArcRaiders",
+                "--aes", "not-a-real-key",
+                "--aes-stdin"
+            ]);
+
+            Assert.Null(options);
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir))
+                Directory.Delete(tempDir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ParseArgs_Refs_StoresTargetDirectionAndOutputFile()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), "UnrealAssetScout.Tests", Guid.NewGuid().ToString("N"));
+        var paksDir = Path.Combine(tempDir, "paks");
+        Directory.CreateDirectory(paksDir);
+
+        try
+        {
+            var options = ConfigOptionsSupport.ParseArgs(
+            [
+                "refs", "PioneerGame/Content/Target.uasset",
+                "--direction", "Incoming",
+                "--kind", "All",
+                "--index", "references.json",
+                "--rebuild-index",
+                "--file", "references.tsv",
+                "--paks", paksDir,
+                "--game", "GAME_ArcRaiders"
+            ]);
+
+            Assert.NotNull(options);
+            Assert.Equal("PioneerGame/Content/Target.uasset", options.ReferenceTarget);
+            Assert.Equal(ReferenceDirection.Incoming, options.ReferenceDirection);
+            Assert.Equal(ReferenceKindScope.All, options.ReferenceKindScope);
+            Assert.Equal("references.tsv", options.ReferenceOutputFilePath);
+            Assert.Equal("references.json", options.ReferenceIndexPath);
+            Assert.True(options.RebuildReferenceIndex);
+            Assert.Null(options.ListOutputFilePath);
+            Assert.Null(options.Mode);
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir))
+                Directory.Delete(tempDir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ParseArgs_RefsRebuildWithoutIndex_ReturnsNull()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), "UnrealAssetScout.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempDir);
+
+        try
+        {
+            var options = ConfigOptionsSupport.ParseArgs(
+            [
+                "refs", "/Game/Target",
+                "--rebuild-index",
+                "--paks", tempDir,
+                "--game", "GAME_ArcRaiders"
+            ]);
+
+            Assert.Null(options);
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir))
+                Directory.Delete(tempDir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ParseArgs_Refs_DefaultsToBothDirections()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), "UnrealAssetScout.Tests", Guid.NewGuid().ToString("N"));
+        var paksDir = Path.Combine(tempDir, "paks");
+        Directory.CreateDirectory(paksDir);
+
+        try
+        {
+            var options = ConfigOptionsSupport.ParseArgs(
+            [
+                "refs", "/Game/Target",
+                "--paks", paksDir,
+                "--game", "GAME_ArcRaiders"
+            ]);
+
+            Assert.NotNull(options);
+            Assert.Equal(ReferenceDirection.Both, options.ReferenceDirection);
+            Assert.Equal(ReferenceKindScope.Package, options.ReferenceKindScope);
         }
         finally
         {
@@ -946,11 +1094,12 @@ public class ConfigOptionsTests
 
             Assert.Null(options);
             var output = outputWriter.ToString();
-            Assert.Contains("Extract or list Unreal Engine pak/utoc assets.", output);
+            Assert.Contains("Inspect, extract, or list Unreal Engine pak/utoc assets.", output);
             Assert.Contains("Usage:", output);
             Assert.Contains("Commands:", output);
             Assert.Contains("list", output);
             Assert.Contains("export", output);
+            Assert.Contains("refs", output);
             Assert.Contains("--help", output);
             Assert.Contains("Documentation:", output);
             Assert.Contains("https://example.com/unrealassetscout-docs", output);

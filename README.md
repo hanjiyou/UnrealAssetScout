@@ -18,6 +18,7 @@ Additionally, I wanted it to be reasonably useful as an exploration tool for new
 - List files in a game's `Paks` directory
 - Filter files by regex (`--filter`)
 - Filter package paths by cached export-type summaries (`--expression` with `list --format types` + `--types`)
+- Find incoming and outgoing package imports and serialized object-property references (`refs`)
 - Export modes:
   - `simple` (standalone non-package files from pak/utoc containers; known formats are extracted or parsed, everything else is copied as-is)
   - `raw` (copy every matched file from pak/utoc containers byte-for-byte, including package companions such as `.uexp`, `.ubulk`, and `.uptnl`)
@@ -28,7 +29,7 @@ Additionally, I wanted it to be reasonably useful as an exploration tool for new
   - `audio` (audio assets and MIDI)
   - `verse` (Verse digests -> `.verse`)
 
-- Optional AES key support for encrypted containers (`--aes` or `--aes-file`)
+- Optional AES key support for encrypted containers (`--aes-stdin`, `--aes`, or `--aes-file`)
 - Optional usmap mappings support (`--usmap`) for games that require it
 - Optional "mappings required" marker in output (`--mark-usmap`), so you know if you are missing out on some mappings
 
@@ -48,6 +49,7 @@ UnrealAssetScout [command] [options]
 
 UnrealAssetScout list [options]
 UnrealAssetScout export <mode> [options]
+UnrealAssetScout refs <target> [options]
 UnrealAssetScout update
 ```
 
@@ -56,7 +58,8 @@ UnrealAssetScout update
 - `-p`, `--paks` (required): Path to the game's `Paks` directory
 - `-g`, `--game` (required): Value from CUE4Parse `EGame` enum (example: `GAME_UE5_4`), that indicate the Unreal Engine version the game uses. You can usually guess this value from the Details tab of Properties dialog of the game exe file.
 - `-a`, `--aes`: AES-256 key (hex) for encrypted containers. Some games require an AES key for all relevant archives, some only for part of the content, and some not at all.
-- `-A`, `--aes-file`: Path to a text file whose first line is the AES-256 key. If you pass both `--aes` and `--aes-file`, the file value wins.
+- `-A`, `--aes-file`: Path to a text file whose first line is the AES-256 key.
+- `--aes-stdin`: Read the AES-256 key from the first line of standard input. This keeps the key out of the process command line. Use only one of `--aes-stdin`, `--aes`, or `--aes-file`.
 - `-u`, `--usmap`: Path to `.usmap` file for unversioned assets. Some files can be read without mappings, while others need them for unversioned property decoding.
 - `-f`, `--filter`: Regex path filter
 - `-e`, `--expression`: Filter packages by their cached export summary using a boolean expression such as `UTexture and %exports > 1`. This only works together with `--types`. See below for more details about expression filtering.
@@ -68,7 +71,7 @@ UnrealAssetScout update
 - `-z`, `--no-log`: Disable file logging completely. If you also pass `--log`, `--log-append`, or `--log-counter`, those settings have no effect for that run.
 - `-D`, `--log-libs`: Also log CUE4Parse warnings/errors and possibly other dependency warnings/errors. These external logs are suppressed by default so they do not pollute normal list output, especially CSV-oriented `list --format types` runs. This option is generally not recommended with `export`, where dependency noise can make progress output and failures harder to read.
 
-These options are defined on the root command and inherited by both `list` and `export`.
+These options are defined on the root command and inherited by `list`, `export`, and `refs`.
 
 ### `list`
 
@@ -107,6 +110,33 @@ Export runs are incremental whenever `.uas-manifest.json` from a previous run is
 - `-q`, `--accept-tool-version`: `export:` Proceed when the running `uas` or CUE4Parse version is not one recorded in the manifest. Outputs made by the earlier version are carried forward rather than re-exported, so the dump is no longer guaranteed to match a full rebuild; every subsequent run reports that it is a mixture. Without this option a version change stops the run and suggests `--rebuild`.
 
 Mode values are parsed case-insensitively, so `export json` and `export Json` both work.
+
+### `refs`
+
+`refs` scans mounted `.uasset` and `.umap` packages and reports static reference edges as tab-separated rows. The target must be an exact mounted package path such as `PioneerGame/Content/Foo.uasset`, or an exact dependency/object identity such as `/Game/Foo`, `/Game/Foo.Foo`, or `packageid:123`.
+
+- `<target>` (required): Mounted package path or dependency identity.
+- `-d`, `--direction`: `Incoming`, `Outgoing`, or `Both` (default).
+- `-k`, `--kind`: `Package` (default), `Properties`, `Bytecode`, or `All`. `Properties` and `Bytecode` deserialize exports and are slower.
+- `-I`, `--index`: Persist reusable reference edges and per-source container fingerprints in this JSON file.
+- `--rebuild-index`: Ignore and atomically replace the selected index. Requires `--index`.
+- `-o`, `--file`: Also write the TSV output to a file while keeping console output visible.
+
+The columns are `Direction`, `Kind`, `SourcePath`, `TargetIdentity`, `TargetPath`, `Status`, and `EvidencePath`. `TargetPath` is empty and `Status` is `UNRESOLVED` when the referenced package is not mounted. `EvidencePath` identifies the export and property for property-level results.
+
+Reference kinds currently emitted are:
+
+- `HARD_PACKAGE_IMPORT`: package-store or import-table dependency.
+- `HARD_OBJECT_PROPERTY`: a deserialized object/class property backed by `FPackageIndex`.
+- `SOFT_OBJECT_PROPERTY`: a deserialized soft/asset object path.
+- `KISMET_HARD_OBJECT_REFERENCE`: an object, class, function, property-owner, or struct package index encoded in parsed Blueprint/Kismet bytecode.
+- `KISMET_SOFT_OBJECT_REFERENCE`: a soft object identity encoded by a parsed Kismet soft-object expression.
+
+This remains static evidence, not proof that a runtime branch executes. Bytecode results mean that a reference is encoded in a parsed expression tree; they do not prove that the containing function or branch runs in the current configuration. Arbitrary strings outside soft-object expressions, references hidden inside unsupported native binary serializers, and runtime-only references are not claimed. Package-load, property-read, and bytecode-read failures are counted separately and make the result explicitly incomplete.
+
+`Outgoing` queries load only the exact target package. `Incoming` and `Both` queries scan every mounted package because any package may refer to the target. Supplying `--filter` restricts the source packages scanned and therefore makes incoming results scoped rather than global. Use `--kind Package` for the cheapest first pass, then `--kind Properties` or `--kind All` when property-level evidence is needed.
+
+When `--index` is supplied, `refs` checkpoints newly scanned sources atomically every 250 changes or about five seconds. A later run reuses a layer only when the source container fingerprint matches and that layer completed successfully. Sources without a usable container fingerprint are deliberately rescanned. The index is also bound to the selected game, `.usmap` hash, `uas` binary, and CUE4Parse binary; a mismatch stops with an explicit error until `--rebuild-index` is requested. Progress reports show processed, scanned, reused, failed, and remaining package counts.
 
 ### `update`
 

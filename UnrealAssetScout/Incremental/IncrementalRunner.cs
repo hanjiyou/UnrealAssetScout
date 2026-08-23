@@ -241,7 +241,7 @@ internal static class IncrementalRunner
         }
     }
 
-    private static string? ResolvePackagePath(AbstractVfsFileProvider provider, string identity) =>
+    internal static string? ResolvePackagePath(AbstractVfsFileProvider provider, string identity) =>
         ResolveIdentity(
             identity,
             id => provider.FilesById.TryGetValue(new FPackageId(id), out var idFile) ? idFile.Path : null,

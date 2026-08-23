@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using CUE4Parse.UE4.Versions;
 using UnrealAssetScout.Export;
+using UnrealAssetScout.References;
 using UnrealAssetScout.TypeFiltering;
 
 namespace UnrealAssetScout.Config;
@@ -13,6 +14,7 @@ internal class Options
 {
     public string? PaksDirectory { get; set; }
     public string? AesKey { get; set; }
+    public bool AesFromStandardInput { get; set; }
     public string? UsmapPath { get; set; }
     public string? TypeFilterExpression { get; set; }
     public string? TypeFilterCsvPath { get; set; }
@@ -21,6 +23,12 @@ internal class Options
     public ExportMode? Mode { get; set; }
     public string? OutputDirectory { get; set; }
     public string? ListOutputFilePath { get; set; }
+    public string? ReferenceTarget { get; set; }
+    public string? ReferenceOutputFilePath { get; set; }
+    public string? ReferenceIndexPath { get; set; }
+    public bool RebuildReferenceIndex { get; set; }
+    public ReferenceDirection ReferenceDirection { get; set; } = ReferenceDirection.Both;
+    public ReferenceKindScope ReferenceKindScope { get; set; } = ReferenceKindScope.Package;
     public Regex? Filter { get; set; }
     public ListOutputFormat ListFormat { get; set; }
     public bool Verbose { get; set; }

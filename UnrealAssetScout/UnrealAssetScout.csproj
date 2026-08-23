@@ -38,12 +38,14 @@
          abbreviate the same commit to different lengths, and the manifest tool gate compares these
          strings verbatim. -->
     <Target Name="StampGitRevisions" BeforeTargets="GetAssemblyAttributes">
-        <Exec Command="git -C &quot;$(MSBuildProjectDirectory)\..&quot; rev-parse --short=12 HEAD"
+        <!-- This invocation is read-only. The process-local wildcard avoids requiring callers to
+             mutate their global Git safe.directory configuration for copied/shared worktrees. -->
+        <Exec Command="git -c safe.directory=* -C &quot;$(MSBuildProjectDirectory)\..&quot; rev-parse --short=12 HEAD"
               ConsoleToMSBuild="true" ContinueOnError="true" StandardOutputImportance="low">
             <Output TaskParameter="ConsoleOutput" PropertyName="UasGitSha" />
             <Output TaskParameter="ExitCode" PropertyName="UasGitExitCode" />
         </Exec>
-        <Exec Command="git -C &quot;$(MSBuildProjectDirectory)\..\CUE4Parse&quot; rev-parse --short=12 HEAD"
+        <Exec Command="git -c safe.directory=* -C &quot;$(MSBuildProjectDirectory)\..\CUE4Parse&quot; rev-parse --short=12 HEAD"
               Condition="Exists('$(MSBuildProjectDirectory)\..\CUE4Parse\.git')"
               ConsoleToMSBuild="true" ContinueOnError="true" StandardOutputImportance="low">
             <Output TaskParameter="ConsoleOutput" PropertyName="Cue4ParseGitSha" />

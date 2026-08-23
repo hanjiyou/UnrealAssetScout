@@ -5,8 +5,8 @@ using UnrealAssetScout.Logging;
 
 namespace UnrealAssetScout.Config;
 
-// Resolves AES key configuration from the dedicated key-file option.
-// Called by ConfigOptionsSupport while building Options before provider setup in Program.Main.
+// Resolves AES key configuration from a dedicated key file or standard input.
+// Called by ConfigOptionsSupport and Program.Run before provider mounting.
 internal static class AesKeyConfigSupport
 {
     internal static bool TryReadKeyFile(string rawValue, out string resolvedValue)
@@ -28,6 +28,26 @@ internal static class AesKeyConfigSupport
         {
             AppLog.Error("Failed to read AES key file '{Path}': {Message}", keyFilePath, e.Message);
             resolvedValue = string.Empty;
+            return false;
+        }
+    }
+
+    internal static bool TryReadKeyFromStandardInput(TextReader reader, out string? resolvedValue)
+    {
+        try
+        {
+            resolvedValue = reader.ReadLine()?.Trim();
+            if (!string.IsNullOrWhiteSpace(resolvedValue))
+                return true;
+
+            AppLog.Error("No AES key was received on standard input.");
+            resolvedValue = null;
+            return false;
+        }
+        catch (Exception e)
+        {
+            AppLog.Error("Failed to read AES key from standard input: {Message}", e.Message);
+            resolvedValue = null;
             return false;
         }
     }

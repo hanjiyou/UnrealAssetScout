@@ -9,6 +9,7 @@ using System.Text.RegularExpressions;
 using CUE4Parse.UE4.Versions;
 using UnrealAssetScout.Export;
 using UnrealAssetScout.Logging;
+using UnrealAssetScout.References;
 using UnrealAssetScout.TypeFiltering;
 using UnrealAssetScout.Update;
 using Superpower;
@@ -29,13 +30,15 @@ internal static class ConfigOptionsSupport
         var rootOptions = CreateRecursiveRootOptions(defaultLogFileName);
         var listOptions = CreateListCommandOptions();
         var exportOptions = CreateExportCommandOptions();
+        var referenceOptions = CreateReferenceCommandOptions();
 
-        var root = new RootCommand("Extract or list Unreal Engine pak/utoc assets.")
+        var root = new RootCommand("Inspect, extract, or list Unreal Engine pak/utoc assets.")
         {
             rootOptions.Paks,
             rootOptions.Game,
             rootOptions.Aes,
             rootOptions.AesFile,
+            rootOptions.AesStdin,
             rootOptions.Usmap,
             rootOptions.Filter,
             rootOptions.Expression,
@@ -66,9 +69,19 @@ internal static class ConfigOptionsSupport
             exportOptions.DryRun,
             exportOptions.AcceptToolVersion
         };
+        var referenceCommand = new Command("refs", "Find static package or serialized-property references to or from one package.")
+        {
+            referenceOptions.Target,
+            referenceOptions.Direction,
+            referenceOptions.Kind,
+            referenceOptions.Index,
+            referenceOptions.RebuildIndex,
+            referenceOptions.File
+        };
         var updateCommand = new Command("update", "Replace this executable with the latest published release.");
         root.Subcommands.Add(listCommand);
         root.Subcommands.Add(exportCommand);
+        root.Subcommands.Add(referenceCommand);
         root.Subcommands.Add(updateCommand);
         ConfigureHelpOption(root);
         ConfigureVersionOption(root);
@@ -101,6 +114,8 @@ internal static class ConfigOptionsSupport
         }
 
         var isExportCommand = ReferenceEquals(parseResult.CommandResult.Command, exportCommand);
+        var isListCommand = ReferenceEquals(parseResult.CommandResult.Command, listCommand);
+        var isReferenceCommand = ReferenceEquals(parseResult.CommandResult.Command, referenceCommand);
         var outputDirectory = isExportCommand ? parseResult.GetRequiredValue(exportOptions.Output) : null;
 
         var options = new Options
@@ -110,8 +125,18 @@ internal static class ConfigOptionsSupport
             TypeFilterExpression = parseResult.GetValue(rootOptions.Expression),
             TypeFilterCsvPath = parseResult.GetValue(rootOptions.Types)?.FullName,
             OutputDirectory = outputDirectory,
-            ListOutputFilePath = !isExportCommand ? parseResult.GetValue(listOptions.File) : null,
-            ListFormat = !isExportCommand ? parseResult.GetValue(listOptions.Format) : ListOutputFormat.List,
+            ListOutputFilePath = isListCommand ? parseResult.GetValue(listOptions.File) : null,
+            ListFormat = isListCommand ? parseResult.GetValue(listOptions.Format) : ListOutputFormat.List,
+            ReferenceTarget = isReferenceCommand ? parseResult.GetRequiredValue(referenceOptions.Target) : null,
+            ReferenceOutputFilePath = isReferenceCommand ? parseResult.GetValue(referenceOptions.File) : null,
+            ReferenceIndexPath = isReferenceCommand ? parseResult.GetValue(referenceOptions.Index) : null,
+            RebuildReferenceIndex = isReferenceCommand && parseResult.GetValue(referenceOptions.RebuildIndex),
+            ReferenceDirection = isReferenceCommand
+                ? parseResult.GetValue(referenceOptions.Direction)
+                : ReferenceDirection.Both,
+            ReferenceKindScope = isReferenceCommand
+                ? parseResult.GetValue(referenceOptions.Kind)
+                : ReferenceKindScope.Package,
             Verbose = isExportCommand && parseResult.GetValue(exportOptions.Verbose),
             MarkUsmap = parseResult.GetValue(rootOptions.MarkUsmap),
             CompactProgress = isExportCommand && parseResult.GetValue(exportOptions.CompactProgress),
@@ -125,10 +150,21 @@ internal static class ConfigOptionsSupport
             LogAppend = parseResult.GetValue(rootOptions.LogAppend),
             NoLog = parseResult.GetValue(rootOptions.NoLog),
             LogLibraries = parseResult.GetValue(rootOptions.LogLibraries),
-            Game = parseResult.GetRequiredValue(rootOptions.Game)
+            Game = parseResult.GetRequiredValue(rootOptions.Game),
+            AesFromStandardInput = parseResult.GetValue(rootOptions.AesStdin)
         };
 
         var aesFilePath = parseResult.GetValue(rootOptions.AesFile)?.FullName;
+        var aesDirectValue = parseResult.GetValue(rootOptions.Aes);
+        var aesSourceCount = (aesFilePath is not null ? 1 : 0) +
+                             (aesDirectValue is not null ? 1 : 0) +
+                             (options.AesFromStandardInput ? 1 : 0);
+        if (aesSourceCount > 1)
+        {
+            AppLog.Error("Use only one AES source: --aes-stdin, --aes, or --aes-file.");
+            return new ParseArgsResult(null, 1);
+        }
+
         if (aesFilePath is not null)
         {
             if (!AesKeyConfigSupport.TryReadKeyFile(aesFilePath, out var aesKey))
@@ -137,7 +173,7 @@ internal static class ConfigOptionsSupport
         }
         else
         {
-            options.AesKey = parseResult.GetValue(rootOptions.Aes);
+            options.AesKey = aesDirectValue;
         }
 
         if (isExportCommand)
@@ -165,6 +201,12 @@ internal static class ConfigOptionsSupport
             {
                 options.JsonSkipTypeNames = [.. JsonSkipTypeConfigSupport.DefaultTypeNames];
             }
+        }
+
+        if (options.RebuildReferenceIndex && string.IsNullOrWhiteSpace(options.ReferenceIndexPath))
+        {
+            AppLog.Error("refs --rebuild-index requires --index.");
+            return new ParseArgsResult(null, 1);
         }
 
         if (string.IsNullOrWhiteSpace(options.TypeFilterExpression) != string.IsNullOrWhiteSpace(options.TypeFilterCsvPath))
@@ -208,6 +250,7 @@ internal static class ConfigOptionsSupport
             ConfigOptionFactory.CreateEnumOption<EGame>("--game", "-g", "Game/engine version from the EGame enum, e.g. GAME_UE5_4", required: true, recursive: true),
             ConfigOptionFactory.CreateStringOption("--aes", "-a", "AES-256 encryption key, e.g. 0xABCD1234...", recursive: true),
             ConfigOptionFactory.CreateExistingFileOption("--aes-file", "-A", "Path to a text file whose first line is the AES-256 key", recursive: true),
+            ConfigOptionFactory.CreateBoolOption("--aes-stdin", "Read the AES-256 key from the first line of standard input", recursive: true),
             ConfigOptionFactory.CreateExistingFileOption("--usmap", "-u", "Path to a .usmap mappings file", recursive: true),
             ConfigOptionFactory.CreateStringOption("--filter", "-f", "Regular expression; only files whose path matches are processed. On an incremental run, narrowing this deletes every previously exported output outside the new scope", recursive: true),
             ConfigOptionFactory.CreateStringOption("--expression", "-e", "Type filter expression; requires --types", recursive: true),
@@ -270,6 +313,40 @@ internal static class ConfigOptionsSupport
             ConfigOptionFactory.CreateBoolOption("--accept-tool-version", "-q", "export: Proceed when the uas or CUE4Parse version is not recorded in the manifest, accepting that output may not match a full rebuild"));
     }
 
+    private static ReferenceCommandOptions CreateReferenceCommandOptions()
+    {
+        var target = new Argument<string>("target")
+        {
+            Description = "Exact mounted package path or dependency identity, e.g. PioneerGame/Content/Foo.uasset or /Game/Foo"
+        };
+        var direction = ConfigOptionFactory.CreateEnumOption<ReferenceDirection>(
+            "--direction",
+            "-d",
+            "Reference direction: Incoming, Outgoing, or Both.");
+        direction.DefaultValueFactory = _ => ReferenceDirection.Both;
+        direction.HelpName = "direction";
+        var kind = ConfigOptionFactory.CreateEnumOption<ReferenceKindScope>(
+            "--kind",
+            "-k",
+            "Reference layer: Package, Properties, Bytecode, or All. Property and bytecode scanning deserialize exports and are slower.");
+        kind.DefaultValueFactory = _ => ReferenceKindScope.Package;
+        kind.HelpName = "kind";
+        var file = new Option<string>("--file", "-o")
+        {
+            Description = "refs: Also write tab-separated results to this file while keeping console output visible.",
+            HelpName = "filename"
+        };
+        var index = new Option<string>("--index", "-I")
+        {
+            Description = "refs: Reusable reference index file. Existing compatible entries are resumed automatically.",
+            HelpName = "filename"
+        };
+        var rebuildIndex = ConfigOptionFactory.CreateBoolOption(
+            "--rebuild-index",
+            "refs: Ignore and atomically replace an existing reference index.");
+        return new ReferenceCommandOptions(target, direction, kind, index, rebuildIndex, file);
+    }
+
     private static void ConfigureHelpOption(RootCommand root)
     {
         var helpOption = root.Options.OfType<HelpOption>().Single();
@@ -306,6 +383,7 @@ internal static class ConfigOptionsSupport
         Option<EGame> Game,
         Option<string> Aes,
         Option<FileInfo> AesFile,
+        Option<bool> AesStdin,
         Option<FileInfo> Usmap,
         Option<string> Filter,
         Option<string> Expression,
@@ -333,6 +411,14 @@ internal static class ConfigOptionsSupport
         Option<bool> Rebuild,
         Option<bool> DryRun,
         Option<bool> AcceptToolVersion);
+
+    private sealed record ReferenceCommandOptions(
+        Argument<string> Target,
+        Option<ReferenceDirection> Direction,
+        Option<ReferenceKindScope> Kind,
+        Option<string> Index,
+        Option<bool> RebuildIndex,
+        Option<string> File);
 
     internal sealed record ParseArgsResult(Options? Options, int ExitCode);
 }
