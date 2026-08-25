@@ -624,6 +624,7 @@ an option to the CLI means adding a row here.
 | `--game` | Gate, `game` |
 | `--paks`, `--aes`, `--aes-file` | Gate, indirectly: a wrong or missing key unmounts containers and the `containers` check fires. The key itself is never recorded |
 | `--output` | Identity; it is where the manifest lives |
+| `--asset-format` | Gate, `assetFormat`, for `models` and `animations`; changing artifact families requires `--rebuild`. Ignored modes record an empty effective value |
 | `--usmap` | Not recorded. The file's content is fingerprinted semantically instead, so regenerating it to a different path is not a change |
 | `--filter`, `--expression`, `--types` | Scope |
 | `--skip-types`, `--skip-types-file`, `--no-skip-types` | Precise, resolved into `skipTypes` |

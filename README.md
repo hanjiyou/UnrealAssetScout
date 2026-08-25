@@ -96,6 +96,7 @@ These options are defined on the root command and inherited by `list`, `export`,
   - `Verse`: Processes only `.uasset` packages and targets Verse digest assets. Currently this means `UVerseDigest` exports.
 
 - `-o`, `--output` (required): `export:` Output directory
+- `--asset-format`: `export models/animations:` Conversion artifact family. `UEFormat` (default) writes `.uemodel`/`.ueanim` and preserves the richer UEFormat animation metadata supported by CUE4Parse; `ActorX` writes `.psk`/`.pskx`/`.psa`. The value is parsed case-insensitively and ignored by non-conversion modes. It is recorded in the incremental manifest, so changing it requires `--rebuild` rather than silently reusing outputs with the old extension.
 - `-v`, `--verbose`: `export:` Log skipped files, including the ones an incremental run skips as unchanged, and add per-step planning timings with a breakdown of which rule marked each source stale
 - `-c`, `--compact`: `export:` Compact progress display. When file logging is enabled, detailed logs still go to the log file; with `--no-log`, the progress display is the only per-file output. Errors and the planning and commit summaries are written to standard error either way, so a run that stops always says why.
 - `-s`, `--skip-types`: `export json:` Replaces the built-in skip list with the specified type names, using normal whitespace-separated command-line values. Unless a higher-precedence skip-type option is also present. See `Default JSON Skip Types` below for the built-in list this replaces.
@@ -369,5 +370,6 @@ uas.exe `
   --paks "C:\Game\Content\Paks" `
   --game GAME_UE5_3 `
   --aes 0xYOUR64BYTEHEXKEY `
+  --asset-format actorx `
   --output "D:\Export\Models"
 ```

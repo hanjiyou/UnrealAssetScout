@@ -17,23 +17,35 @@ namespace UnrealAssetScout.Export.Exporters;
 // when a package export matches one of the supported conversion asset types.
 internal static class ConversionExporter
 {
-    internal static ExportAttemptResult TryExportModel(UObject export, PackageExportContext packageContext, string outputDir)
+    internal static ExportAttemptResult TryExportModel(
+        UObject export,
+        PackageExportContext packageContext,
+        string outputDir,
+        ConversionAssetFormat assetFormat)
     {
         if (export is not (UMaterialInterface or USkeletalMesh or USkeleton or UStaticMesh or ALandscapeProxy))
             return ExportAttemptResult.NotHandled();
 
-        return TryExport(export, packageContext, outputDir);
+        return TryExport(export, packageContext, outputDir, assetFormat);
     }
 
-    internal static ExportAttemptResult TryExportAnimation(UObject export, PackageExportContext packageContext, string outputDir)
+    internal static ExportAttemptResult TryExportAnimation(
+        UObject export,
+        PackageExportContext packageContext,
+        string outputDir,
+        ConversionAssetFormat assetFormat)
     {
         if (export is not (UAnimSequence or UAnimMontage or UAnimComposite))
             return ExportAttemptResult.NotHandled();
 
-        return TryExport(export, packageContext, outputDir);
+        return TryExport(export, packageContext, outputDir, assetFormat);
     }
 
-    private static ExportAttemptResult TryExport(UObject export, PackageExportContext packageContext, string outputDir)
+    private static ExportAttemptResult TryExport(
+        UObject export,
+        PackageExportContext packageContext,
+        string outputDir,
+        ConversionAssetFormat assetFormat)
     {
 
         try
@@ -43,7 +55,8 @@ internal static class ConversionExporter
 
             // Package processors expose a synchronous contract. Keep that contract while using
             // CUE4Parse's current session-based asynchronous exporter internally.
-            var results = session.RunAsync(outputDir, new ExportOptions()).GetAwaiter().GetResult();
+            var meshFormat = ResolveMeshFormat(assetFormat);
+            var results = session.RunAsync(outputDir, new ExportOptions(meshFormat)).GetAwaiter().GetResult();
             var result = results.FirstOrDefault();
             if (result is null)
                 return ExportAttemptResult.NotHandled();
@@ -53,11 +66,17 @@ internal static class ConversionExporter
                     $"{packageContext.Path}/{export.Name}",
                     result.Error?.ToString() ?? "CUE4Parse conversion failed without an error");
 
-            var savedFilePath = result.DiskFilePaths?.FirstOrDefault();
-            if (string.IsNullOrEmpty(savedFilePath))
+            var savedFilePaths = result.DiskFilePaths?
+                .Where(path => !string.IsNullOrEmpty(path))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (savedFilePaths is not { Count: > 0 })
                 return ExportAttemptResult.NotHandled();
 
-            return ExportAttemptResult.Success($"{packageContext.Path}/{export.Name}", savedFilePath);
+            var logPath = $"{packageContext.Path}/{export.Name}";
+            return ExportAttemptResult.Success(savedFilePaths
+                .Select(path => new ExportedArtifact(logPath, path))
+                .ToList());
         }
         catch (Exception e)
         {
@@ -67,4 +86,11 @@ internal static class ConversionExporter
             return ExportAttemptResult.Failure($"{packageContext.Path}/{export.Name}", e.ToString());
         }
     }
+
+    internal static EMeshFormat ResolveMeshFormat(ConversionAssetFormat assetFormat) => assetFormat switch
+    {
+        ConversionAssetFormat.UEFormat => EMeshFormat.UEFormat,
+        ConversionAssetFormat.ActorX => EMeshFormat.ActorX,
+        _ => throw new ArgumentOutOfRangeException(nameof(assetFormat), assetFormat, "Unsupported conversion asset format")
+    };
 }

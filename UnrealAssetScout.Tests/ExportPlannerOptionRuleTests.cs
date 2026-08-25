@@ -4,6 +4,24 @@ namespace UnrealAssetScout.Tests;
 
 public sealed class ExportPlannerOptionRuleTests
 {
+    [Fact]
+    public void Plan_AssetFormatMismatch_RequiresRebuild()
+    {
+        var manifest = PlanInputsFixture.Manifest("Game/A.uasset");
+        manifest.AssetFormat = "ueformat";
+
+        var result = ExportPlanner.Plan(PlanInputsFixture.Create(
+            manifest: manifest,
+            sources: PlanInputsFixture.Sources("Game/A.uasset"),
+            fingerprints: PlanInputsFixture.Fingerprints("Game/A.uasset"),
+            assetFormat: "actorx"));
+
+        Assert.Null(result.Plan);
+        Assert.Contains("asset format 'ueformat'", result.Error);
+        Assert.Contains("'actorx'", result.Error);
+        Assert.Contains("--rebuild", result.Error);
+    }
+
     // One source whose single export is a UTexture2D deriving from UTexture deriving from UObject.
     private static ExportManifest ManifestWithTextureExport()
     {

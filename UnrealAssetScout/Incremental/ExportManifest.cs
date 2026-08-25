@@ -9,9 +9,10 @@ namespace UnrealAssetScout.Incremental;
 // to decide what is stale. It is always a complete description of the dump, never a delta.
 internal sealed class ExportManifest
 {
-    [JsonPropertyName("schema")] public int Schema { get; set; } = 2;
+    [JsonPropertyName("schema")] public int Schema { get; set; } = 3;
     [JsonPropertyName("mode")] public string Mode { get; set; } = string.Empty;
     [JsonPropertyName("game")] public string Game { get; set; } = string.Empty;
+    [JsonPropertyName("assetFormat")] public string AssetFormat { get; set; } = string.Empty;
     [JsonPropertyName("tool")] public List<ToolVersionPair> Tool { get; set; } = [];
     [JsonPropertyName("uasVersion")] public string UasVersion { get; set; } = string.Empty;
     [JsonPropertyName("skipTypes")] public List<string> SkipTypes { get; set; } = [];

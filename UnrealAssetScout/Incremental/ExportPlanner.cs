@@ -32,6 +32,11 @@ internal static class ExportPlanner
                 $"manifest was written for game '{manifest.Game}', this run is '{inputs.Game}'; " +
                 "pass --rebuild to replace it");
 
+        if (!string.Equals(manifest.AssetFormat, inputs.AssetFormat, System.StringComparison.Ordinal))
+            return PlanResult.Failed(
+                $"manifest was written for asset format '{manifest.AssetFormat}', this run is " +
+                $"'{inputs.AssetFormat}'; pass --rebuild to replace it");
+
         var mounted = new HashSet<string>(inputs.Containers, System.StringComparer.OrdinalIgnoreCase);
         var missing = manifest.Containers.FirstOrDefault(container => !mounted.Contains(container));
         if (missing is not null)

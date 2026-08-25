@@ -13,6 +13,7 @@ namespace UnrealAssetScout.Incremental;
 internal sealed class ManifestBuilder(
     string mode,
     string game,
+    string assetFormat,
     IReadOnlyList<ToolVersionPair> tool,
     IReadOnlyList<string> skipTypes,
     bool scriptBytecode,
@@ -116,6 +117,7 @@ internal sealed class ManifestBuilder(
         {
             Mode = mode,
             Game = game,
+            AssetFormat = assetFormat,
             Tool = [.. tool],
             UasVersion = AppVersion.DisplayText,
             SkipTypes = [.. skipTypes],

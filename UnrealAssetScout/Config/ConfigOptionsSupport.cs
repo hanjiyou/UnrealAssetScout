@@ -58,6 +58,7 @@ internal static class ConfigOptionsSupport
         var exportCommand = new Command("export", "Export files from mounted pak/utoc containers.")
         {
             exportOptions.Mode,
+            exportOptions.AssetFormat,
             exportOptions.JsonSkipTypes,
             exportOptions.JsonSkipTypesFile,
             exportOptions.NoSkipTypes,
@@ -144,6 +145,9 @@ internal static class ConfigOptionsSupport
             Rebuild = isExportCommand && parseResult.GetValue(exportOptions.Rebuild),
             DryRun = isExportCommand && parseResult.GetValue(exportOptions.DryRun),
             AcceptToolVersion = isExportCommand && parseResult.GetValue(exportOptions.AcceptToolVersion),
+            AssetFormat = isExportCommand
+                ? parseResult.GetValue(exportOptions.AssetFormat)
+                : ConversionAssetFormat.UEFormat,
             LogCounter = parseResult.GetValue(rootOptions.LogCounter),
             Log = parseResult.GetValue(rootOptions.Log) ?? defaultLogFileName,
             LogSpecified = parseResult.GetResult(rootOptions.Log) is not null,
@@ -295,12 +299,19 @@ internal static class ConfigOptionsSupport
         skipTypesFile.HelpName = "filename";
         var noSkipTypes = ConfigOptionFactory.CreateBoolOption("--no-skip-types", "-k", "export json: Disable the built-in skip list entirely");
         var scriptBytecode = ConfigOptionFactory.CreateBoolOption("--script-bytecode", "-b", "export json: Serialize script bytecode into JSON output. Ignored for other export modes.");
+        var assetFormat = new Option<ConversionAssetFormat>("--asset-format")
+        {
+            Description = "export models/animations: Conversion artifact family: UEFormat or ActorX. Ignored for other export modes."
+        };
+        assetFormat.DefaultValueFactory = _ => ConversionAssetFormat.UEFormat;
+        assetFormat.HelpName = "format";
 
         return new(
             new Argument<ExportMode>("mode")
             {
                 Description = "Export mode: Simple, Raw, Json, Textures, Models, Animations, Audio, or Verse"
             },
+            assetFormat,
             skipTypes,
             skipTypesFile,
             noSkipTypes,
@@ -401,6 +412,7 @@ internal static class ConfigOptionsSupport
 
     private sealed record ExportCommandOptions(
         Argument<ExportMode> Mode,
+        Option<ConversionAssetFormat> AssetFormat,
         Option<string[]> JsonSkipTypes,
         Option<FileInfo> JsonSkipTypesFile,
         Option<bool> NoSkipTypes,

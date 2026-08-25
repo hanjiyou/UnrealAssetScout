@@ -23,12 +23,14 @@ internal static class PlanInputsFixture
         bool acceptToolVersion = false,
         string mode = Mode,
         string game = Game,
+        string assetFormat = "",
         ToolVersionPair? tool = null,
         Func<string, string?>? resolvePackagePath = null) =>
         new(
             Manifest: manifest,
             Mode: mode,
             Game: game,
+            AssetFormat: assetFormat,
             Tool: tool ?? Tool,
             Containers: containers ?? ["a.pak"],
             SkipTypes: skipTypes ?? [],

@@ -7,10 +7,26 @@ public sealed class ManifestBuilderTests
     private static ManifestBuilder NewBuilder() => new(
         mode: "json",
         game: "GAME_UE5_1",
+        assetFormat: "",
         tool: [new ToolVersionPair(1, "b")],
         skipTypes: [],
         scriptBytecode: false,
         containers: ["a.pak"]);
+
+    [Fact]
+    public void Build_RecordsEffectiveAssetFormat()
+    {
+        var builder = new ManifestBuilder(
+            mode: "animations",
+            game: "GAME_UE5_1",
+            assetFormat: "ueformat",
+            tool: [new ToolVersionPair(1, "b")],
+            skipTypes: [],
+            scriptBytecode: false,
+            containers: ["a.pak"]);
+
+        Assert.Equal("ueformat", builder.Build().AssetFormat);
+    }
 
     [Fact]
     public void AddRecorded_InternsPathsOnceAndReferencesThemById()

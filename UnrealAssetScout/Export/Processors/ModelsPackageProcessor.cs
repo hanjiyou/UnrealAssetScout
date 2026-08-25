@@ -9,11 +9,15 @@ namespace UnrealAssetScout.Export.Processors;
 // Created by ExportProcessor.ProcessFiles for ExportMode.Models, then passed to
 // ExportProcessor.ProcessPackageMode to export meshes, skeletons, materials, and landscapes from
 // each loaded package.
-internal sealed class ModelsPackageProcessor(string outputDir, bool verbose, ModeStatsAccumulator modeStats)
+internal sealed class ModelsPackageProcessor(
+    string outputDir,
+    bool verbose,
+    ModeStatsAccumulator modeStats,
+    ConversionAssetFormat assetFormat)
     : PackageModeProcessorBase(outputDir, verbose, modeStats)
 {
     protected override ExportAttemptResult TryExport(UObject export, PackageExportContext packageContext) =>
-        ConversionExporter.TryExportModel(export, packageContext, OutputDir);
+        ConversionExporter.TryExportModel(export, packageContext, OutputDir, assetFormat);
 
     protected override string NoExportsReason => "no model exports";
 }

@@ -20,7 +20,7 @@ internal static class ExportManifestStore
     // Bump this only when defaulting a field could change what a plan decides. Adding a field the
     // planner never reads does not qualify: an older manifest still plans identically, and every
     // existing dump would otherwise have to be rebuilt for nothing.
-    internal const int CurrentSchema = 2;
+    internal const int CurrentSchema = 3;
 
     // Indented so the global block at the top can be read when reviewing how a run was
     // configured; ManifestSourceConverter keeps each source entry on one line so that block is

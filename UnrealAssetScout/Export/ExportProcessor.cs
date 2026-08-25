@@ -24,6 +24,7 @@ public static class ExportProcessor
     internal static RunStats ProcessFiles(
         AbstractVfsFileProvider provider,
         ExportMode mode,
+        ConversionAssetFormat assetFormat,
         string outputDir,
         Regex? filter,
         bool verbose,
@@ -133,7 +134,7 @@ public static class ExportProcessor
                     runStatsAccumulator.ModeStats.SetSummaryLabel("Model export(s)");
                     runStatsAccumulator.RecordRequirement(ProcessPackageMode(
                         item, markUsmap,
-                        new ModelsPackageProcessor(outputDir, verbose, runStatsAccumulator.ModeStats),
+                        new ModelsPackageProcessor(outputDir, verbose, runStatsAccumulator.ModeStats, assetFormat),
                         recorder, constituentsOf?.Invoke(path)));
                     break;
 
@@ -141,7 +142,7 @@ public static class ExportProcessor
                     runStatsAccumulator.ModeStats.SetSummaryLabel("Animation export(s)");
                     runStatsAccumulator.RecordRequirement(ProcessPackageMode(
                         item, markUsmap,
-                        new AnimationsPackageProcessor(outputDir, verbose, runStatsAccumulator.ModeStats),
+                        new AnimationsPackageProcessor(outputDir, verbose, runStatsAccumulator.ModeStats, assetFormat),
                         recorder, constituentsOf?.Invoke(path)));
                     break;
 

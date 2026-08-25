@@ -33,6 +33,9 @@ internal static class IncrementalRunner
         var mode = options.Mode!.Value;
         var isJsonMode = mode == ExportMode.Json;
         var effectiveScriptBytecode = isJsonMode && options.ScriptBytecode;
+        var effectiveAssetFormat = mode is ExportMode.Models or ExportMode.Animations
+            ? options.AssetFormat.ToString().ToLowerInvariant()
+            : string.Empty;
 
         var planWatch = Stopwatch.StartNew();
         var stepWatch = Stopwatch.StartNew();
@@ -63,6 +66,7 @@ internal static class IncrementalRunner
             Manifest: previous,
             Mode: mode.ToString().ToLowerInvariant(),
             Game: options.Game!.Value.ToString(),
+            AssetFormat: effectiveAssetFormat,
             Tool: new ToolVersionPair(ExportCompatibility.Version, AppVersion.Cue4ParseGitSha),
             Containers: containers,
             SkipTypes: options.JsonSkipTypeNames,
@@ -111,12 +115,13 @@ internal static class IncrementalRunner
         }
 
         var builder = new ManifestBuilder(
-            mode.ToString().ToLowerInvariant(), options.Game.Value.ToString(), plan.ToolVersions,
+            mode.ToString().ToLowerInvariant(), options.Game.Value.ToString(), effectiveAssetFormat,
+            plan.ToolVersions,
             options.JsonSkipTypeNames, effectiveScriptBytecode, containers);
 
         var recorder = new SourceRecorder(outputDir, usmap, effectiveScriptBytecode, isJsonMode);
         var stats = ExportProcessor.ProcessFiles(
-            provider, mode, outputDir, options.Filter, options.Verbose, options.MarkUsmap,
+            provider, mode, options.AssetFormat, outputDir, options.Filter, options.Verbose, options.MarkUsmap,
             compactCounterSink, typeFilteredPaths, options.LogCounter, options.JsonSkipTypeNames,
             incrementalWorkList: plan.Baseline is null ? null : new HashSet<string>(plan.WorkList),
             recorder: recorder,

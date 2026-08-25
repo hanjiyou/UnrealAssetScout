@@ -10,6 +10,7 @@ internal sealed record PlanInputs(
     ExportManifest? Manifest,
     string Mode,
     string Game,
+    string AssetFormat,
     ToolVersionPair Tool,
     IReadOnlyList<string> Containers,
     IReadOnlyList<string> SkipTypes,

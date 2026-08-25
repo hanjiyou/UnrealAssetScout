@@ -21,6 +21,7 @@ internal class Options
     public Func<PackageModel, bool>? TypeFilterPredicate { get; set; }
     public EGame? Game { get; set; }
     public ExportMode? Mode { get; set; }
+    public ConversionAssetFormat AssetFormat { get; set; } = ConversionAssetFormat.UEFormat;
     public string? OutputDirectory { get; set; }
     public string? ListOutputFilePath { get; set; }
     public string? ReferenceTarget { get; set; }
