@@ -33,6 +33,12 @@ Additionally, I wanted it to be reasonably useful as an exploration tool for new
 - Optional usmap mappings support (`--usmap`) for games that require it
 - Optional "mappings required" marker in output (`--mark-usmap`), so you know if you are missing out on some mappings
 
+### Explicit partial-container export
+
+`export --allow-partial-mount --filter <specific-regex>` permits a deliberately bounded export from containers that were successfully mounted. The default still rejects unresolved encrypted containers. This opt-in is rejected outside `export` or without an explicit filter. It does not obtain keys, decrypt unsupported containers, hide missing-container diagnostics, or prove that dependencies are complete. Use the normal local AES input mechanism; do not include key material in logs or committed profiles. The shared AssetPipeline wrapper passes this option only when `game.allow_partial_mount` is explicitly true and records that choice.
+
+Validation: the three `PartialMountOptionsTests` cover the default, required explicit filtering, and permitted filtered export. A real filtered local sample retained mounted/unloaded/pending-container counts and exported only requested accessible packages. Successful package parsing is separate from version/schema compatibility and complete asset reconstruction.
+
 ## CUE4Parse
 
 UnrealAssetScout is built on top of [CUE4Parse](https://github.com/FabianFG/CUE4Parse), and the tool is subject to that library's capabilities and limitations.

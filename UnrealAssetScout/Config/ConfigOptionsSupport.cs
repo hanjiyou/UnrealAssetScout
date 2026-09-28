@@ -39,6 +39,7 @@ internal static class ConfigOptionsSupport
             rootOptions.Aes,
             rootOptions.AesFile,
             rootOptions.AesStdin,
+            rootOptions.AllowPartialMount,
             rootOptions.Usmap,
             rootOptions.Filter,
             rootOptions.Expression,
@@ -155,7 +156,8 @@ internal static class ConfigOptionsSupport
             NoLog = parseResult.GetValue(rootOptions.NoLog),
             LogLibraries = parseResult.GetValue(rootOptions.LogLibraries),
             Game = parseResult.GetRequiredValue(rootOptions.Game),
-            AesFromStandardInput = parseResult.GetValue(rootOptions.AesStdin)
+            AesFromStandardInput = parseResult.GetValue(rootOptions.AesStdin),
+            AllowPartialMount = parseResult.GetValue(rootOptions.AllowPartialMount)
         };
 
         var aesFilePath = parseResult.GetValue(rootOptions.AesFile)?.FullName;
@@ -246,6 +248,11 @@ internal static class ConfigOptionsSupport
             }
         }
 
+        if (options.AllowPartialMount && (!isExportCommand || options.Filter is null))
+        {
+            AppLog.Error("--allow-partial-mount requires export with an explicit --filter; unmatched or missing dependencies are still errors");
+            return new ParseArgsResult(null, 1);
+        }
         return new ParseArgsResult(options, 0);
     }
     private static RootOptions CreateRecursiveRootOptions(string defaultLogFileName)
@@ -255,6 +262,7 @@ internal static class ConfigOptionsSupport
             ConfigOptionFactory.CreateStringOption("--aes", "-a", "AES-256 encryption key, e.g. 0xABCD1234...", recursive: true),
             ConfigOptionFactory.CreateExistingFileOption("--aes-file", "-A", "Path to a text file whose first line is the AES-256 key", recursive: true),
             ConfigOptionFactory.CreateBoolOption("--aes-stdin", "Read the AES-256 key from the first line of standard input", recursive: true),
+            ConfigOptionFactory.CreateBoolOption("--allow-partial-mount", "Export a filtered scope from already mounted containers; unavailable containers remain inaccessible and completeness is not claimed", recursive: true),
             ConfigOptionFactory.CreateExistingFileOption("--usmap", "-u", "Path to a .usmap mappings file", recursive: true),
             ConfigOptionFactory.CreateStringOption("--filter", "-f", "Regular expression; only files whose path matches are processed. On an incremental run, narrowing this deletes every previously exported output outside the new scope", recursive: true),
             ConfigOptionFactory.CreateStringOption("--expression", "-e", "Type filter expression; requires --types", recursive: true),
@@ -395,6 +403,7 @@ internal static class ConfigOptionsSupport
         Option<string> Aes,
         Option<FileInfo> AesFile,
         Option<bool> AesStdin,
+        Option<bool> AllowPartialMount,
         Option<FileInfo> Usmap,
         Option<string> Filter,
         Option<string> Expression,

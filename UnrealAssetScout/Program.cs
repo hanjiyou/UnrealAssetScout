@@ -134,10 +134,15 @@ public static class Program
 
             if (provider.RequiredKeys.Count > 0)
             {
-                AppLog.Error(
-                    "{Count} container(s) are encrypted and could not be mounted - provide the correct AES key via --aes-stdin, --aes, or --aes-file",
-                    provider.RequiredKeys.Count);
-                return 1;
+                if (!options.AllowPartialMount || provider.MountedVfs.Count == 0)
+                {
+                    AppLog.Error(
+                        "{Count} container(s) are encrypted and could not be mounted - provide the correct AES key via --aes-stdin, --aes, or --aes-file",
+                        provider.RequiredKeys.Count);
+                    return 1;
+                }
+                AppLog.Warning("Explicit partial mount: {Mounted} containers available, {Missing} encrypted containers unavailable. Only the filtered mounted scope can be exported; missing dependencies still fail.",
+                    provider.MountedVfs.Count, provider.RequiredKeys.Count);
             }
 
             provider.PostMount();

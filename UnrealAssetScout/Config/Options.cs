@@ -15,6 +15,7 @@ internal class Options
     public string? PaksDirectory { get; set; }
     public string? AesKey { get; set; }
     public bool AesFromStandardInput { get; set; }
+    public bool AllowPartialMount { get; set; }
     public string? UsmapPath { get; set; }
     public string? TypeFilterExpression { get; set; }
     public string? TypeFilterCsvPath { get; set; }
