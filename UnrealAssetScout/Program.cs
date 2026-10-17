@@ -104,7 +104,13 @@ public static class Program
                                       options.ReferenceKindScope is ReferenceKindScope.Bytecode or ReferenceKindScope.All;
 
             if (options.UsmapPath is not null)
+            {
                 provider.MappingsContainer = new FileUsmapTypeMappingsProvider(options.UsmapPath);
+                var mappings = (UsmapTypeMappingsProvider) provider.MappingsContainer;
+                if (mappings.CompatibilityProfile is not null)
+                    AppLog.Information("Mappings compatibility: {Profile}; normalized {Count} inherited declarations; source SHA-256 {Hash}",
+                        mappings.CompatibilityProfile, mappings.NormalizedTypes.Count, mappings.SourceSha256);
+            }
 
             provider.Initialize();
 

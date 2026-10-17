@@ -41,6 +41,22 @@ Validation: the three `PartialMountOptionsTests` cover the default, required exp
 
 ## CUE4Parse
 
+### ARC Raiders 2.x (UE 5.7)
+
+`GAME_ArcRaiders` now targets the current UE 5.7 build and retains the Theia/Embark
+container readers. Older UE 5.3 ARC batches are historical inputs; their profiles
+must not be rerun against this game selector.
+
+The verified `5.7.4-1418508+pioneer_2.00.x-PioneerGame.usmap` dump repeats inherited
+field declarations in empty derived schemas. `FileUsmapTypeMappingsProvider`
+normalizes that exact SHA-256 in memory before package parsing and usmap semantic
+fingerprinting. It reports the compatibility profile and affected type count;
+the original file is not rewritten. Unknown mapping hashes are parsed unchanged.
+
+The workspace ARC entry point is
+`AssetPipeline/GameSpecial/ArcRaiders/Invoke-ArcRaidersParse.ps1`. Its build profile
+uses the Steam install and mappings under `USMapFiles/ArcRaiders`.
+
 UnrealAssetScout is built on top of [CUE4Parse](https://github.com/FabianFG/CUE4Parse), and the tool is subject to that library's capabilities and limitations.
 
 - UnrealAssetScout only exports what CUE4Parse can parse and what this project has an exporter for.

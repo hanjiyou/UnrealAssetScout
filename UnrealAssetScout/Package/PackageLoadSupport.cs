@@ -6,6 +6,7 @@ using CUE4Parse.UE4.IO.Objects;
 using CUE4Parse.UE4.Objects.UObject;
 using CUE4Parse.UE4.Readers;
 using CUE4Parse.UE4.Versions;
+using UnrealAssetScout.Logging;
 
 namespace UnrealAssetScout.Package;
 
@@ -107,8 +108,9 @@ internal static class PackageLoadSupport
         {
             return (null, PackageLoadResult.FailureRequiresUsmap);
         }
-        catch
+        catch (Exception e)
         {
+            AppLog.Warning(e, "Could not load package {Path}: {Reason}", file.Path, e.Message);
             return (null, PackageLoadResult.FailureOther);
         }
     }

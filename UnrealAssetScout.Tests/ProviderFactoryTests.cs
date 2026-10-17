@@ -14,6 +14,8 @@ public class ProviderFactoryTests
         var provider = ProviderFactory.Create("C:\\Paks", EGame.GAME_ArcRaiders);
 
         Assert.IsType<TheiaFileProvider>(provider);
+        Assert.Equal(EGame.GAME_UE5_7.GetVersion(), provider.Versions.Ver);
+        Assert.True(EGame.GAME_ArcRaiders >= EGame.GAME_UE5_7 && EGame.GAME_ArcRaiders < EGame.GAME_UE5_8);
     }
 
     [Fact]
