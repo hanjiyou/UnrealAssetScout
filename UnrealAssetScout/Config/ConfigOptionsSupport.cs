@@ -64,6 +64,7 @@ internal static class ConfigOptionsSupport
             exportOptions.JsonSkipTypesFile,
             exportOptions.NoSkipTypes,
             exportOptions.ScriptBytecode,
+            exportOptions.AnimationCompressionSummary,
             exportOptions.Output,
             exportOptions.Verbose,
             exportOptions.CompactProgress,
@@ -143,6 +144,8 @@ internal static class ConfigOptionsSupport
             MarkUsmap = parseResult.GetValue(rootOptions.MarkUsmap),
             CompactProgress = isExportCommand && parseResult.GetValue(exportOptions.CompactProgress),
             ScriptBytecode = isExportCommand && parseResult.GetValue(exportOptions.ScriptBytecode),
+            AnimationCompressionSummarySelection = isExportCommand
+                ? parseResult.GetValue(exportOptions.AnimationCompressionSummary)?.FullName : null,
             Rebuild = isExportCommand && parseResult.GetValue(exportOptions.Rebuild),
             DryRun = isExportCommand && parseResult.GetValue(exportOptions.DryRun),
             AcceptToolVersion = isExportCommand && parseResult.GetValue(exportOptions.AcceptToolVersion),
@@ -185,6 +188,12 @@ internal static class ConfigOptionsSupport
         if (isExportCommand)
         {
             options.Mode = parseResult.GetRequiredValue(exportOptions.Mode);
+            if (options.AnimationCompressionSummarySelection is not null &&
+                (options.Mode != ExportMode.Json || options.DryRun || options.Rebuild || options.AcceptToolVersion))
+            {
+                AppLog.Error("Animation compression summary is a read-only export json diagnostic; incremental/rebuild flags are not supported.");
+                return new ParseArgsResult(null, 1);
+            }
             var inlineSkipTypesSpecified = parseResult.GetResult(exportOptions.JsonSkipTypes) is not null;
             var fileSkipTypesPath = parseResult.GetValue(exportOptions.JsonSkipTypesFile)?.FullName;
             var noSkipTypes = parseResult.GetValue(exportOptions.NoSkipTypes);
@@ -307,6 +316,8 @@ internal static class ConfigOptionsSupport
         skipTypesFile.HelpName = "filename";
         var noSkipTypes = ConfigOptionFactory.CreateBoolOption("--no-skip-types", "-k", "export json: Disable the built-in skip list entirely");
         var scriptBytecode = ConfigOptionFactory.CreateBoolOption("--script-bytecode", "-b", "export json: Serialize script bytecode into JSON output. Ignored for other export modes.");
+        var animationCompressionSummary = ConfigOptionFactory.CreateExistingFileOption(
+            "--animation-compression-summary", "export json diagnostic only: JSON selection with source_objects; summarize original per-track headers without decoding/exporting animation.");
         var assetFormat = new Option<ConversionAssetFormat>("--asset-format")
         {
             Description = "export models/animations: Conversion artifact family: UEFormat or ActorX. Ignored for other export modes."
@@ -324,6 +335,7 @@ internal static class ConfigOptionsSupport
             skipTypesFile,
             noSkipTypes,
             scriptBytecode,
+            animationCompressionSummary,
             output,
             ConfigOptionFactory.CreateBoolOption("--verbose", "-v", "export: Print skipped files in the log"),
             ConfigOptionFactory.CreateBoolOption("--compact", "-c", "export: Show compact progress and write full logs to a file"),
@@ -426,6 +438,7 @@ internal static class ConfigOptionsSupport
         Option<FileInfo> JsonSkipTypesFile,
         Option<bool> NoSkipTypes,
         Option<bool> ScriptBytecode,
+        Option<FileInfo> AnimationCompressionSummary,
         Option<string> Output,
         Option<bool> Verbose,
         Option<bool> CompactProgress,

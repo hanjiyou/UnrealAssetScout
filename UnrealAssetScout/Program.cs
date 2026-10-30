@@ -11,6 +11,7 @@ using CUE4Parse.UE4.Objects.Core.Misc;
 using CUE4Parse.UE4.Versions;
 using UnrealAssetScout.Config;
 using UnrealAssetScout.Export;
+using UnrealAssetScout.Export.Processors;
 using UnrealAssetScout.Incremental;
 using UnrealAssetScout.List;
 using UnrealAssetScout.Logging;
@@ -194,6 +195,14 @@ public static class Program
                 }
                 else
                 {
+                    if (options.AnimationCompressionSummarySelection is not null)
+                    {
+                        // The provider/mappings are mounted once above. This is
+                        // diagnostic source data, not an incremental export or
+                        // a successful animation producer/qualification receipt.
+                        return AnimationsPackageProcessor.WriteCompressionSummary(provider,
+                            options.AnimationCompressionSummarySelection, options.OutputDirectory!);
+                    }
                     var (exitCode, incrementalStats) = IncrementalRunner.Run(
                         provider, options, compactCounterSink, typeFilteredPaths);
                     if (exitCode != 0)

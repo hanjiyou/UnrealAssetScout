@@ -77,6 +77,8 @@ public sealed class SourceFingerprintIndexTests
 
         // What Build must record instead: the entry the provider itself resolves for the path.
         Assert.Same(patchPak, provider.Files["Game/A.uasset"]);
+        Assert.True(provider.Files.TryGetValue("Game/A.uasset", out var directlyResolved));
+        Assert.Same(patchPak, directlyResolved);
         Assert.Same(patchPak, Assert.Single(SourceFingerprintIndex.ResolvedFiles(provider)));
     }
 
